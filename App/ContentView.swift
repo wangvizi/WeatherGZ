@@ -8,6 +8,9 @@ struct ContentView: View {
         NavigationStack {
             ZStack {
                 background.ignoresSafeArea()
+                if store.snapshot?.minute.isRaining() ?? false {
+                    RainStreaks().opacity(0.06).ignoresSafeArea()
+                }
                 if let snap = store.snapshot, snap.current != nil || !snap.days.isEmpty || snap.minute.available {
                     ScrollView(showsIndicators: false) {
                         VStack(alignment: .leading, spacing: 18) {
@@ -105,9 +108,9 @@ struct ContentView: View {
                 }
                 Spacer()
                 if let cur = snap.current {
-                    Image(systemName: WIcon.symbol(code: cur.weatherCode, night: WeatherTheme.isNight()))
-                        .font(.system(size: 40, weight: .thin))
-                        .foregroundStyle(.white.opacity(0.9))
+                    WeatherGlyph(code: cur.weatherCode, night: WeatherTheme.isNight())
+                        .frame(width: 48, height: 48)
+                        .opacity(0.95)
                 }
             }
         }
@@ -170,9 +173,9 @@ struct ContentView: View {
                 HStack(spacing: 10) {
                     ForEach(days) { d in
                         VStack(spacing: 6) {
-                            Text(WeatherText.weekday(d.date)).font(.caption).foregroundStyle(.white.opacity(0.75))
-                            Image(systemName: WIcon.symbol(code: d.dayWeatherCode))
-                                .font(.system(size: 22, weight: .thin)).foregroundStyle(.white)
+                            Text(WeatherText.dateLabel(d)).font(.caption).foregroundStyle(.white.opacity(0.75))
+                            WeatherGlyph(code: d.dayWeatherCode)
+                                .frame(width: 24, height: 24).opacity(0.95)
                             Text(WeatherText.fromCode(d.dayWeatherCode))
                                 .font(.caption2).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
                             Text("\(d.highC)°").font(.subheadline.bold()).foregroundStyle(.white)

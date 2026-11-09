@@ -2,28 +2,182 @@ import SwiftUI
 
 // MARK: - App 与小组件共用的视觉组件
 
-enum WIcon {
-    static func symbol(code: String, night: Bool = false) -> String {
+// MARK: 手绘矢量天气图标（App 与小组件共用，替代 SF Symbols）
+
+struct WeatherGlyph: View {
+    private enum Cat {
+        case clear, partly, cloudy, rain, heavy, thunder, sleet, snow, fog, dust
+    }
+
+    private let cat: Cat
+    private let night: Bool
+    private let tint: Color
+
+    init(code: String, night: Bool = false, tint: Color = .white) {
+        self.night = night
+        self.tint = tint
         switch code {
-        case "00": return night ? "moon.stars.fill" : "sun.max.fill"
-        case "01": return night ? "cloud.moon.fill" : "cloud.sun.fill"
-        case "02": return "cloud.fill"
-        case "03": return "cloud.rain.fill"
-        case "04": return "cloud.bolt.fill"
-        case "05": return "cloud.bolt.rain.fill"
-        case "06": return "cloud.sleet.fill"
-        case "07", "21": return "cloud.rain.fill"
-        case "08", "22": return "cloud.drizzle.fill"
-        case "09", "10", "11", "12", "23", "24", "25": return "cloud.heavyrain.fill"
-        case "13", "15", "16", "27": return "cloud.snow.fill"
-        case "14", "17", "26", "28": return "snowflake"
-        case "18": return "cloud.fog.fill"
-        case "19": return "cloud.sleet.fill"
-        case "20", "30", "31": return "wind"
-        case "29": return night ? "cloud.moon.fill" : "sun.haze.fill"
-        case "32", "53": return "cloud.haze.fill"
-        default: return "questionmark"
+        case "00": cat = .clear
+        case "01": cat = .partly
+        case "02": cat = .cloudy
+        case "03", "07", "08", "21", "22": cat = .rain
+        case "09", "10", "11", "12", "23", "24", "25": cat = .heavy
+        case "04", "05": cat = .thunder
+        case "06", "19": cat = .sleet
+        case "13", "14", "15", "16", "17", "26", "27", "28": cat = .snow
+        case "18", "32", "53": cat = .fog
+        case "20", "29", "30", "31": cat = .dust
+        default: cat = .cloudy
         }
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let s = min(geo.size.width, geo.size.height)
+            ZStack { layer(s) }
+                .frame(width: geo.size.width, height: geo.size.height)
+        }
+    }
+
+    private func cloud(_ s: CGFloat, dy: CGFloat = 0) -> some View {
+        ZStack {
+            Circle().fill(tint).frame(width: 0.44*s, height: 0.44*s).offset(x: -0.17*s, y: -0.05*s + dy)
+            Circle().fill(tint).frame(width: 0.56*s, height: 0.56*s).offset(x: 0.10*s, y: -0.13*s + dy)
+            RoundedRectangle(cornerRadius: 0.16*s).fill(tint)
+                .frame(width: 0.92*s, height: 0.36*s).offset(y: 0.10*s + dy)
+        }
+    }
+
+    private func sun(_ s: CGFloat, r: CGFloat, rays: Int) -> some View {
+        ZStack {
+            Circle().fill(tint).frame(width: 0.44*r, height: 0.44*r)
+            ForEach(0..<rays, id: \.self) { i in
+                Capsule().fill(tint).frame(width: 0.06*r, height: 0.16*r)
+                    .offset(y: -0.36*r)
+                    .rotationEffect(.degrees(Double(i) * 360.0 / Double(rays)))
+            }
+        }
+    }
+
+    private func moon(_ s: CGFloat) -> some View {
+        Path { p in
+            p.addArc(center: CGPoint(x: 0.52*s, y: 0.5*s), radius: 0.36*s,
+                     startAngle: .degrees(70), endAngle: .degrees(290), clockwise: false)
+            p.addArc(center: CGPoint(x: 0.70*s, y: 0.5*s), radius: 0.28*s,
+                     startAngle: .degrees(290), endAngle: .degrees(70), clockwise: true)
+            p.closeSubpath()
+        }
+        .fill(tint)
+    }
+
+    private func drop(_ s: CGFloat, x: CGFloat, y: CGFloat, h: CGFloat) -> some View {
+        Capsule().fill(tint).frame(width: 0.075*s, height: h)
+            .rotationEffect(.degrees(15)).offset(x: x, y: y)
+    }
+
+    private func flake(_ s: CGFloat, x: CGFloat, y: CGFloat) -> some View {
+        ZStack {
+            ForEach(0..<3, id: \.self) { i in
+                Capsule().fill(tint).frame(width: 0.05*s, height: 0.2*s)
+                    .rotationEffect(.degrees(Double(i) * 60))
+            }
+        }
+        .frame(width: 0.22*s, height: 0.22*s)
+        .offset(x: x, y: y)
+    }
+
+    private func bolt(_ s: CGFloat) -> some View {
+        Path { p in
+            p.move(to: CGPoint(x: 0.56*s, y: 0.40*s))
+            p.addLine(to: CGPoint(x: 0.34*s, y: 0.70*s))
+            p.addLine(to: CGPoint(x: 0.49*s, y: 0.70*s))
+            p.addLine(to: CGPoint(x: 0.38*s, y: 0.96*s))
+            p.addLine(to: CGPoint(x: 0.68*s, y: 0.62*s))
+            p.addLine(to: CGPoint(x: 0.53*s, y: 0.62*s))
+            p.addLine(to: CGPoint(x: 0.64*s, y: 0.40*s))
+            p.closeSubpath()
+        }
+        .fill(tint)
+    }
+
+    private func lines(_ s: CGFloat, widths: [CGFloat]) -> some View {
+        VStack(spacing: 0.13*s) {
+            ForEach(0..<widths.count, id: \.self) { i in
+                Capsule().fill(tint).frame(width: widths[i]*s, height: 0.09*s)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func layer(_ s: CGFloat) -> some View {
+        switch cat {
+        case .clear:
+            if night { moon(s) } else { sun(s, r: s, rays: 8) }
+        case .partly:
+            ZStack {
+                sun(0.6*s, r: 0.6*s, rays: 6).offset(x: 0.22*s, y: -0.2*s)
+                cloud(s, dy: 0.1*s)
+            }
+        case .cloudy:
+            cloud(s)
+        case .rain:
+            ZStack {
+                cloud(s, dy: -0.16*s)
+                drop(s, x: -0.2*s, y: 0.32*s, h: 0.18*s)
+                drop(s, x: 0.02*s, y: 0.36*s, h: 0.2*s)
+                drop(s, x: 0.24*s, y: 0.32*s, h: 0.18*s)
+            }
+        case .heavy:
+            ZStack {
+                cloud(s, dy: -0.18*s)
+                drop(s, x: -0.24*s, y: 0.32*s, h: 0.24*s)
+                drop(s, x: -0.06*s, y: 0.36*s, h: 0.26*s)
+                drop(s, x: 0.12*s, y: 0.32*s, h: 0.24*s)
+                drop(s, x: 0.28*s, y: 0.36*s, h: 0.22*s)
+            }
+        case .thunder:
+            ZStack {
+                cloud(s, dy: -0.22*s)
+                bolt(s)
+            }
+        case .sleet:
+            ZStack {
+                cloud(s, dy: -0.16*s)
+                drop(s, x: -0.16*s, y: 0.32*s, h: 0.18*s)
+                flake(s, x: 0.14*s, y: 0.36*s)
+            }
+        case .snow:
+            ZStack {
+                cloud(s, dy: -0.16*s)
+                flake(s, x: -0.22*s, y: 0.36*s)
+                flake(s, x: 0.02*s, y: 0.4*s)
+                flake(s, x: 0.24*s, y: 0.36*s)
+            }
+        case .fog:
+            lines(s, widths: [0.8, 0.6, 0.8, 0.5])
+        case .dust:
+            lines(s, widths: [0.85, 0.6, 0.8])
+        }
+    }
+}
+
+// MARK: 雨丝纹理（背景点缀）
+
+struct RainStreaks: View {
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                ForEach(0..<16, id: \.self) { i in
+                    Capsule()
+                        .fill(Color.white)
+                        .frame(width: 1.2, height: CGFloat(10 + (i * 7) % 12))
+                        .rotationEffect(.degrees(20))
+                        .position(x: geo.size.width * CGFloat((i * 37) % 100) / 100,
+                                  y: geo.size.height * CGFloat((i * 53) % 100) / 100)
+                }
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 

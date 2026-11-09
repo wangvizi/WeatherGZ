@@ -185,4 +185,21 @@ public enum WeatherText {
         let cal = Calendar(identifier: .gregorian)
         return weekdayNames[cal.component(.weekday, from: date) - 1]
     }
+
+    /// 日期标签：今天显示"今天"，其余显示 M/d
+    public static func dateLabel(_ day: DayForecast) -> String {
+        let today = Self.dayKey(Date())
+        if day.dateKey == today { return "今天" }
+        let parts = day.dateKey.split(separator: "-")
+        guard parts.count == 3, let m = Int(parts[1]), let d = Int(parts[2]) else {
+            return weekday(day.date)
+        }
+        return "\(m)/\(d)"
+    }
+
+    public static func dayKey(_ date: Date) -> String {
+        let cal = Calendar(identifier: .gregorian)
+        let c = cal.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
 }

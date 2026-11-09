@@ -119,12 +119,15 @@ struct MediumWidgetView: View {
                 .frame(width: 150, height: 150)
                 .blur(radius: 30)
                 .offset(x: 180, y: -60)
+            if entry.snapshot?.minute.isRaining(from: entry.date) ?? false {
+                RainStreaks().opacity(0.10)
+            }
 
             if let snap = entry.snapshot, snap.source != .none {
                 content(snap)
             } else {
                 VStack(spacing: 6) {
-                    Image(systemName: "cloud.sun.fill").font(.title2).foregroundStyle(.white.opacity(0.9))
+                    WeatherGlyph(code: "03").frame(width: 34, height: 34)
                     Text("等待首次更新").font(.caption.bold()).foregroundStyle(.white)
                     Text("打开一次 App 即可获取数据")
                         .font(.caption2).foregroundStyle(.white.opacity(0.7))
@@ -163,10 +166,10 @@ struct MediumWidgetView: View {
                     Text(snap.current?.weatherText ?? "")
                         .font(.system(size: 12)).opacity(0.9)
                     Spacer(minLength: 0)
-                    Image(systemName: WIcon.symbol(code: snap.current?.weatherCode ?? "",
-                                                   night: WeatherTheme.isNight(entry.date)))
-                        .font(.system(size: 22))
-                        .opacity(0.9)
+                    WeatherGlyph(code: snap.current?.weatherCode ?? "",
+                                 night: WeatherTheme.isNight(entry.date))
+                        .frame(width: 26, height: 26)
+                        .opacity(0.95)
                 }
                 HStack(spacing: 8) {
                     Text("\(snap.current?.windDirec ?? "") \(snap.current?.windPower ?? "")")
@@ -206,10 +209,10 @@ struct MediumWidgetView: View {
             VStack(spacing: 9) {
                 ForEach(snap.days.prefix(4)) { d in
                     HStack(spacing: 0) {
-                        Text(WeatherText.weekday(d.date))
+                        Text(WeatherText.dateLabel(d))
                             .font(.system(size: 11)).frame(width: 34, alignment: .leading)
-                        Image(systemName: WIcon.symbol(code: d.dayWeatherCode))
-                            .font(.system(size: 11)).frame(width: 22)
+                        WeatherGlyph(code: d.dayWeatherCode)
+                            .frame(width: 15, height: 15)
                         Text("\(d.highC)°")
                             .font(.system(size: 12, weight: .semibold))
                             .frame(width: 26, alignment: .trailing)
