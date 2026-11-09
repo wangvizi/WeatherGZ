@@ -103,77 +103,107 @@ extension View {
 struct MediumWidgetView: View {
     let entry: WeatherEntry
 
-    var body: some View {
-        if let snap = entry.snapshot, snap.source != .none {
-            HStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(snap.city.name).font(.caption).foregroundStyle(.secondary)
-                    Text("\(snap.current?.tempC ?? 0)°")
-                        .font(.system(size: 34, weight: .light))
-                    Text(snap.current?.weatherText ?? "").font(.caption)
-                    Text(snap.fetchedAt.formatted(.dateTime.hour().minute()) + " 更新")
-                        .font(.caption2).foregroundStyle(.tertiary)
-                }
-                .frame(width: 84, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    minuteLine(snap)
-                    HStack(spacing: 10) {
-                        ForEach(snap.days.prefix(4)) { d in
-                            VStack(spacing: 2) {
-                                Text(WeatherText.weekday(d.date)).font(.caption2).foregroundStyle(.secondary)
-                                Text("\(d.lowC)°/\(d.highC)°").font(.caption2.monospacedDigit())
-                            }
-                        }
-                    }
-                    if let alert = snap.alerts.first {
-                        Text(alert.title).font(.caption2).lineLimit(1).foregroundStyle(.orange)
-                    }
-                    if snap.isStale {
-                        Text("数据可能已过期 · 打开 App 刷新").font(.caption2).foregroundStyle(.tertiary)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 12)
-            }
-            .padding(12)
-            .widgetContainerBackground { Color.clear }
-        } else {
-            VStack(spacing: 6) {
-                Image(systemName: "cloud.sun").font(.title2).foregroundStyle(.secondary)
-                Text("等待首次更新").font(.caption.bold())
-                Text("打开一次 App 即可获取数据")
-                    .font(.caption2).foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .widgetContainerBackground { Color.clear }
-        }
+    private var background: LinearGradient {
+        let snap = entry.snapshot
+        WeatherTheme.gradient(code: snap?.current?.weatherCode ?? "",
+                              raining: snap?.minute.isRaining(from: entry.date) ?? false,
+                              night: WeatherTheme.isNight(entry.date))
     }
 
-    @ViewBuilder
-    private func minuteLine(_ snap: WeatherSnapshot) -> some View {
-        let m = snap.minute
-        if m.available {
-            if m.isRaining(from: entry.date) {
-                if let stop = m.minutesUntilStop(from: entry.date) {
-                    Text("正在下雨 · \(stop) 分钟后停").font(.subheadline.bold())
-                } else {
-                    Text("正在下雨 · 持续中").font(.subheadline.bold())
-                }
-            } else if let until = m.minutesUntilRain(from: entry.date) {
-                Text("\(until) 分钟后开始下").font(.subheadline.bold())
-                Text("至少还要 \(m.minutesOfNoRain(from: entry.date) ?? until) 分钟无明显降水")
-                    .font(.caption2).foregroundStyle(.secondary)
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            background
+            // 右上角柔光点缀
+            Circle()
+                .fill(.white.opacity(0.10))
+                .frame(width: 150, height: 150)
+                .blur(radius: 30)
+                .offset(x: 180, y: -60)
+
+            if let snap = entry.snapshot, snap.source != .none {
+                content(snap)
             } else {
-                Text("未来 2 小时无明显降水").font(.subheadline.bold())
+                VStack(spacing: 6) {
+                    Image(systemName: "cloud.sun.fill").font(.title2).foregroundStyle(.white.opacity(0.9))
+                    Text("等待首次更新").font(.caption.bold()).foregroundStyle(.white)
+                    Text("打开一次 App 即可获取数据")
+                        .font(.caption2).foregroundStyle(.white.opacity(0.7))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            Text("中国天气网官方 · MPF 短临")
-                .font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
-        } else {
-            Text("分钟级降水暂不可用").font(.subheadline)
         }
+        .widgetContainerBackground { background }
+    }
+
+    private func content(_ snap: WeatherSnapshot) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            // 左列：城市/预警、温度、风湿度、雨情、更新时间
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 6) {
+                    Image(systemName: "location.north.line.fill")
+                        .font(.system(size: 9)).opacity(0.8)
+                    Text(snap.city.name)
+                        .font(.system(size: 13, weight: .semibold))
+                    Spacer(minLength: 4)
+                    if let alert = snap.alerts.first {
+                        Text(alert.title)
+                            .font(.system(size: 9, weight: .medium))
+                            .lineLimit(1)
+                            .padding(.horizontal, 7).padding(.vertical, 3)
+                            .background(.white.opacity(0.22), in: Capsule())
+                    }
+                }
+
+                Spacer(minLength: 2)
+
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("\(snap.current?.tempC ?? 0)°")
+                        .font(.system(size: 36, weight: .thin))
+                    Text(snap.current?.weatherText ?? "")
+                        .font(.system(size: 13)).opacity(0.9)
+                }
+                HStack(spacing: 8) {
+                    Text("\(snap.current?.windDirec ?? "") \(snap.current?.windPower ?? "")")
+                    if let h = snap.current?.humidity { Text("湿度 \(h)%") }
+                }
+                .font(.system(size: 11)).opacity(0.75)
+
+                Spacer(minLength: 4)
+
+                Text(RainMessage.text(snap.minute, from: entry.date))
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 4) {
+                    Text(snap.fetchedAt.formatted(.dateTime.hour().minute()) + " 更新")
+                        .font(.system(size: 9)).opacity(0.55)
+                    if snap.isStale {
+                        Text("· 打开 App 刷新").font(.system(size: 9)).foregroundStyle(.yellow.opacity(0.8))
+                    }
+                }
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+            // 右列：四天预报
+            VStack(spacing: 8) {
+                ForEach(snap.days.prefix(4)) { d in
+                    HStack(spacing: 6) {
+                        Text(WeatherText.weekday(d.date))
+                            .font(.system(size: 11)).frame(width: 30, alignment: .leading)
+                        Image(systemName: WIcon.symbol(code: d.dayWeatherCode))
+                            .font(.system(size: 12)).frame(width: 20)
+                        Text("\(d.highC)°")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("\(d.lowC)°")
+                            .font(.system(size: 11)).opacity(0.55)
+                    }
+                    .foregroundStyle(.white)
+                }
+            }
+            .padding(.top, 2)
+        }
+        .padding(12)
     }
 }
 
