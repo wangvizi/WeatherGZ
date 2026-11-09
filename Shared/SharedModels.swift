@@ -186,16 +186,22 @@ public enum WeatherText {
         return weekdayNames[cal.component(.weekday, from: date) - 1]
     }
 
-    /// 日期标签：今天显示"今天"，其余显示 M/d（兼容 yyyyMMdd 与 yyyy-MM-dd）
+    /// 日期标签：今天显示"今天"，其余显示 M/d（兼容 yyyy-MM-dd / yyyyMMdd / M/d）
     public static func dateLabel(_ day: DayForecast) -> String {
         let digits = day.dateKey.filter { $0.isNumber }
-        guard digits.count == 8,
-              let m = Int(digits.dropFirst(4).prefix(2)),
-              let d = Int(digits.suffix(2)) else {
-            return weekday(day.date)
+        if digits.count == 8,
+           let m = Int(digits.dropFirst(4).prefix(2)),
+           let d = Int(digits.suffix(2)) {
+            if digits == Self.dayKey(Date()).filter { $0.isNumber } { return "今天" }
+            return "\(m)/\(d)"
         }
-        if digits == Self.dayKey(Date()).filter { $0.isNumber } { return "今天" }
-        return "\(m)/\(d)"
+        let parts = day.dateKey.split(separator: "/")
+        if parts.count == 2, let m = Int(parts[0]), let d = Int(parts[1]) {
+            let t = Calendar(identifier: .gregorian).dateComponents([.month, .day], from: Date())
+            if m == t.month, d == t.day { return "今天" }
+            return "\(m)/\(d)"
+        }
+        return weekday(day.date)
     }
 
     public static func dayKey(_ date: Date) -> String {
