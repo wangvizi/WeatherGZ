@@ -152,9 +152,10 @@ struct GZMediumView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(.trailing, 2)
 
-            // 右列：四天预报（无分隔线，固定列宽）
-            VStack(alignment: .leading, spacing: 9) {
-                ForEach(Array(snap.days.prefix(4).enumerated()), id: \.element.id) { _, d in
+            // 右列：四天预报，四行均匀铺满整个高度（首行对齐城市行、末行对齐更新时间）
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(snap.days.prefix(4).enumerated()), id: \.element.id) { idx, d in
+                    if idx > 0 { Spacer(minLength: 0) }
                     HStack(spacing: 0) {
                         Text(WeatherText.dateLabel(d))
                             .font(.system(size: 11))
@@ -174,8 +175,7 @@ struct GZMediumView: View {
                     .foregroundStyle(.white)
                 }
             }
-            .frame(width: 112)
-            .padding(.top, 2)
+            .frame(width: 112, maxHeight: .infinity, alignment: .topLeading)
         }
         .padding(12)
     }
