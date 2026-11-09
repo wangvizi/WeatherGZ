@@ -5,7 +5,7 @@ import Combine
 @MainActor
 final class WeatherStore: ObservableObject {
     static let shared = WeatherStore()
-    static let buildTag = "v3.1-gz"
+    static let buildTag = "v3.2-gz"
     static let refreshInterval: TimeInterval = 10 * 60
 
     @Published var snapshot: WeatherSnapshot?

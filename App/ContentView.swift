@@ -171,9 +171,9 @@ struct ContentView: View {
                 .font(.caption.bold()).foregroundStyle(.white.opacity(0.8))
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(days) { d in
+                    ForEach(Array(days.enumerated()), id: \.element.id) { idx, d in
                         VStack(spacing: 6) {
-                            Text(WeatherText.dateLabel(d)).font(.caption).foregroundStyle(.white.opacity(0.75))
+                            Text(WeatherText.dayLabel(d, index: idx)).font(.caption).foregroundStyle(.white.opacity(0.75))
                             WeatherGlyph(code: d.dayWeatherCode)
                                 .frame(width: 24, height: 24).opacity(0.95)
                             Text(WeatherText.fromCode(d.dayWeatherCode))

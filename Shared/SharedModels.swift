@@ -186,6 +186,13 @@ public enum WeatherText {
         return weekdayNames[cal.component(.weekday, from: date) - 1]
     }
 
+    /// 按位置的日标签：第一行"今天"、第二行"明天"，其余显示 M/d
+    public static func dayLabel(_ day: DayForecast, index: Int) -> String {
+        if index == 0 { return "今天" }
+        if index == 1 { return "明天" }
+        return dateLabel(day)
+    }
+
     /// 日期标签：今天显示"今天"，其余显示 M/d（兼容 yyyy-MM-dd / yyyyMMdd / M/d）
     public static func dateLabel(_ day: DayForecast) -> String {
         let digits = day.dateKey.filter { $0.isNumber }

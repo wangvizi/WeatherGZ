@@ -157,7 +157,7 @@ struct GZMediumView: View {
                 ForEach(Array(snap.days.prefix(4).enumerated()), id: \.element.id) { idx, d in
                     if idx > 0 { Spacer(minLength: 0) }
                     HStack(spacing: 0) {
-                        Text(WeatherText.dateLabel(d))
+                        Text(WeatherText.dayLabel(d, index: idx))
                             .font(.system(size: 11))
                             .frame(width: 30, alignment: .leading)
                         WeatherGlyph(code: d.dayWeatherCode)
