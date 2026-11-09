@@ -175,7 +175,7 @@ struct GZMediumView: View {
                     .foregroundStyle(.white)
                 }
             }
-            .frame(width: 112, maxHeight: .infinity, alignment: .topLeading)
+            .frame(minWidth: 112, maxWidth: 112, maxHeight: .infinity, alignment: .topLeading)
         }
         .padding(12)
     }
