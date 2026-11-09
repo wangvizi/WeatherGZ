@@ -77,7 +77,7 @@ struct GZMediumView: View {
             WeatherTheme.gradient(code: entry.snap.current?.weatherCode ?? "",
                                   raining: entry.snap.minute.isRaining(from: entry.date),
                                   night: WeatherTheme.isNight(entry.date))
-                .overlay(RainStreaks().opacity(entry.snap.minute.isRaining(from: entry.date) ? 0.10 : 0))
+                .overlay(RainDrops().opacity(entry.snap.minute.isRaining(from: entry.date) ? 0.5 : 0.12))
         }
     }
 
@@ -93,59 +93,56 @@ struct GZMediumView: View {
     }
 
     private func content(_ snap: WeatherSnapshot) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            // 左列
+        HStack(alignment: .top, spacing: 4) {
+            // 左列（参考版式：城市行 / 大温度+风湿度+大图标 / 粗体雨情两行 / 更新时间）
             VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 5) {
+                HStack(spacing: 6) {
+                    Image(systemName: "location.north.line.fill")
+                        .font(.system(size: 9))
+                        .opacity(0.7)
                     Text(snap.city.name)
-                        .font(.system(size: 11, weight: .semibold))
-                        .padding(.horizontal, 7).padding(.vertical, 2)
-                        .background(.white.opacity(0.16), in: Capsule())
+                        .font(.system(size: 12, weight: .semibold))
+                    Spacer(minLength: 4)
                     if let alert = snap.alerts.first {
                         Text(alert.title)
-                            .font(.system(size: 9, weight: .medium))
+                            .font(.system(size: 10, weight: .medium))
                             .lineLimit(1)
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(.orange.opacity(0.85), in: Capsule())
+                            .padding(.horizontal, 7).padding(.vertical, 2)
+                            .background(.white.opacity(0.18), in: Capsule())
                     }
-                    Spacer(minLength: 0)
                 }
 
-                Spacer(minLength: 2)
+                Spacer(minLength: 6)
 
-                HStack(alignment: .center, spacing: 6) {
+                HStack(alignment: .center, spacing: 4) {
                     Text("\(snap.current?.tempC ?? 0)°")
-                        .font(.system(size: 38, weight: .thin))
+                        .font(.system(size: 44, weight: .medium))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(snap.current?.weatherText ?? "")
-                            .font(.system(size: 13, weight: .medium))
-                            .opacity(0.9)
-                        Text("\(snap.current?.windDirec ?? "") \(snap.current?.windPower ?? "") · 湿度 \(snap.current?.humidity ?? 0)%")
-                            .font(.system(size: 10))
-                            .opacity(0.6)
+                        Text("\(snap.current?.windDirec ?? "") \(snap.current?.windPower ?? "")")
+                            .font(.system(size: 11))
+                            .opacity(0.8)
+                        Text("湿度 \(snap.current?.humidity ?? 0)%")
+                            .font(.system(size: 11))
+                            .opacity(0.8)
                     }
-                    Spacer(minLength: 0)
+                    .padding(.top, 6)
+                    Spacer(minLength: 2)
                     WeatherGlyph(code: snap.current?.weatherCode ?? "",
                                  night: WeatherTheme.isNight(entry.date))
-                        .frame(width: 34, height: 34)
+                        .frame(width: 40, height: 40)
+                        .padding(.trailing, 2)
                 }
 
-                Spacer(minLength: 5)
+                Spacer(minLength: 8)
 
-                Text(RainTimeline.headline(snap.minute, from: entry.date))
-                    .font(.system(size: 13, weight: .bold))
-                let compact = RainTimeline.compactText(snap.minute, from: entry.date)
-                if !compact.isEmpty {
-                    Text(compact)
-                        .font(.system(size: 10, weight: .medium))
-                        .opacity(0.85)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text(rainNarrative(snap))
+                    .font(.system(size: 12.5, weight: .bold))
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                Spacer(minLength: 3)
+                Spacer(minLength: 4)
 
-                Text(snap.fetchedAt.formatted(.dateTime.hour().minute()) + " 更新"
+                Text("更新时间  \(snap.fetchedAt.formatted(.dateTime.hour().minute()))"
                      + (snap.isStale ? " · 打开 App 刷新" : ""))
                     .font(.system(size: 9))
                     .foregroundStyle(snap.isStale ? AnyShapeStyle(Color.yellow.opacity(0.9))
@@ -153,37 +150,45 @@ struct GZMediumView: View {
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(.trailing, 2)
 
-            // 右列：四天预报（固定列宽 + 分隔线）
-            VStack(spacing: 0) {
-                ForEach(Array(snap.days.prefix(4).enumerated()), id: \.element.id) { idx, d in
+            // 右列：四天预报（无分隔线，固定列宽）
+            VStack(alignment: .leading, spacing: 9) {
+                ForEach(Array(snap.days.prefix(4).enumerated()), id: \.element.id) { _, d in
                     HStack(spacing: 0) {
                         Text(WeatherText.dateLabel(d))
-                            .font(.system(size: idx == 0 ? 11 : 10,
-                                          weight: idx == 0 ? .semibold : .regular))
-                            .frame(width: 32, alignment: .leading)
+                            .font(.system(size: 11))
+                            .frame(width: 30, alignment: .leading)
                         WeatherGlyph(code: d.dayWeatherCode)
-                            .frame(width: 16, height: 16)
-                            .opacity(0.9)
+                            .frame(width: 18, height: 18)
+                            .opacity(0.95)
                         Spacer(minLength: 3)
                         Text("\(d.highC)°")
-                            .font(.system(size: 12, weight: .semibold))
-                            .frame(width: 24, alignment: .trailing)
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(width: 28, alignment: .trailing)
                         Text("\(d.lowC)°")
-                            .font(.system(size: 11))
+                            .font(.system(size: 12))
                             .opacity(0.5)
-                            .frame(width: 24, alignment: .trailing)
+                            .frame(width: 26, alignment: .trailing)
                     }
                     .foregroundStyle(.white)
-                    .padding(.vertical, 6)
-                    if idx < 3 {
-                        Rectangle().fill(.white.opacity(0.12)).frame(height: 0.5)
-                    }
                 }
             }
-            .frame(width: 106)
+            .frame(width: 112)
+            .padding(.top, 2)
         }
         .padding(12)
+    }
+
+    /// 参考图式叙述："38 分钟后雨渐小，转为中雨，不过 58 分钟后雨会再次变大"
+    private func rainNarrative(_ snap: WeatherSnapshot) -> String {
+        let m = snap.minute
+        guard m.available else { return "打开 App 获取分钟级降水" }
+        let evs = RainTimeline.events(m, from: entry.date)
+        if evs.isEmpty { return RainTimeline.headline(m, from: entry.date) }
+        let parts = evs.prefix(2).map { $0.text }
+        if parts.count == 2 { return parts[0] + "，不过 " + parts[1] }
+        return parts[0]
     }
 }
 
@@ -255,6 +260,44 @@ struct GZLockView: View {
         if m.isRaining(from: entry.date) { return "雨中" }
         if let s = m.minutesUntilRain(from: entry.date) { return "\(s)分后雨" }
         return "无雨"
+    }
+}
+
+// MARK: - 玻璃水珠质感（参考图背景）
+
+struct RainDrops: View {
+    // 归一化坐标 (x, y, 半径比例)，固定种子保证每次渲染一致
+    private static let drops: [(CGFloat, CGFloat, CGFloat)] = [
+        (0.06, 0.12, 0.030), (0.14, 0.55, 0.022), (0.22, 0.20, 0.016), (0.30, 0.78, 0.028),
+        (0.38, 0.35, 0.014), (0.45, 0.62, 0.024), (0.52, 0.10, 0.018), (0.58, 0.88, 0.020),
+        (0.66, 0.42, 0.026), (0.72, 0.15, 0.015), (0.80, 0.70, 0.022), (0.86, 0.30, 0.018),
+        (0.93, 0.58, 0.026), (0.10, 0.85, 0.016), (0.34, 0.05, 0.020), (0.62, 0.72, 0.014),
+        (0.88, 0.92, 0.018), (0.04, 0.45, 0.012), (0.48, 0.28, 0.012), (0.76, 0.52, 0.012),
+    ]
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width, h = geo.size.height
+            ZStack(alignment: .topLeading) {
+                ForEach(0 ..< Self.drops.count, id: \.self) { i in
+                    let d = Self.drops[i]
+                    let r = d.2 * min(w, h)
+                    Circle()
+                        .fill(Color.white.opacity(0.10))
+                        .overlay(
+                            Circle().strokeBorder(Color.white.opacity(0.22), lineWidth: 0.5)
+                        )
+                        .overlay(
+                            Circle().fill(Color.white.opacity(0.30))
+                                .frame(width: r * 0.35, height: r * 0.35)
+                                .offset(x: -r * 0.25, y: -r * 0.3)
+                        )
+                        .frame(width: r * 2, height: r * 2)
+                        .offset(x: d.0 * w - r, y: d.1 * h - r)
+                }
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 
