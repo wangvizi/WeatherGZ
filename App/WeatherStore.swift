@@ -5,7 +5,7 @@ import Combine
 @MainActor
 final class WeatherStore: ObservableObject {
     static let shared = WeatherStore()
-    static let buildTag = "v2.0-gz"
+    static let buildTag = "v2.1-gz"
     static let refreshInterval: TimeInterval = 10 * 60
 
     @Published var snapshot: WeatherSnapshot?
@@ -39,9 +39,11 @@ final class WeatherStore: ObservableObject {
         isLoading = true
         lastError = nil
         let c = city
+        // 乡镇级 ID（10 位）官方实况/逐天不支持，回退到所属区县（前 9 位）
+        let apiID = c.id.count > 9 ? String(c.id.prefix(9)) : c.id
         do {
-            async let cur = try? client.fetchCurrent(cityID: c.id)
-            async let di = try? client.fetchDailyAndAlerts(cityID: c.id)
+            async let cur = try? client.fetchCurrent(cityID: apiID)
+            async let di = try? client.fetchDailyAndAlerts(cityID: apiID)
             async let mf = try? client.fetchMinute(lat: c.lat, lon: c.lon)
 
             let current = try? await cur

@@ -6,168 +6,288 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if let snap = store.snapshot {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 16) {
-                            rainCard(snap)
-                            if let cur = snap.current { currentCard(cur) }
+            ZStack {
+                background.ignoresSafeArea()
+                if let snap = store.snapshot, snap.current != nil || !snap.days.isEmpty || snap.minute.available {
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 18) {
+                            header(snap)
+                            if snap.minute.available { rainCard(snap) }
                             if !snap.days.isEmpty { daysCard(snap.days) }
                             if !snap.alerts.isEmpty { alertsCard(snap.alerts) }
-                            footerCard(snap)
+                            footer(snap)
                         }
-                        .padding()
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 30)
                     }
                 } else {
-                    VStack(spacing: 12) {
-                        placeholderCard()
+                    VStack(spacing: 14) {
+                        Image(systemName: "cloud.sun.rain.fill")
+                            .font(.system(size: 44)).foregroundStyle(.white.opacity(0.9))
+                        Text(store.isLoading ? "正在获取数据…" : "等待首次更新")
+                            .font(.title3.bold()).foregroundStyle(.white)
+                        Text("仅贵州省城市 · 中国天气网官方 · 无需 Key")
+                            .font(.footnote).foregroundStyle(.white.opacity(0.7))
                         if let err = store.lastError {
-                            Text(err).font(.caption).foregroundStyle(.orange)
+                            Text(err).font(.caption).foregroundStyle(.yellow)
                                 .multilineTextAlignment(.center)
                         }
                         Button {
                             Task { await store.refresh() }
                         } label: {
-                            Label("立即获取", systemImage: "arrow.clockwise")
+                            Text("立即获取")
+                                .font(.headline).foregroundStyle(.primary)
+                                .padding(.horizontal, 22).padding(.vertical, 10)
+                                .background(.ultraThinMaterial, in: Capsule())
                         }
-                        .buttonStyle(.borderedProminent)
                     }
                     .padding()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .navigationTitle(snap_title)
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button { showCityPicker = true } label: {
-                        Label("切换城市", systemImage: "location.circle")
+                        Image(systemName: "location.circle.fill")
+                            .font(.title3).foregroundStyle(.white.opacity(0.85))
                     }
                 }
             }
             .refreshable { await store.refresh() }
             .task { await store.refreshIfNeeded() }
-            .overlay {
-                if store.isLoading && store.snapshot != nil {
-                    ProgressView().padding(20)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                }
-            }
             .sheet(isPresented: $showCityPicker) { CityPickerView() }
         }
     }
 
-    private var snap_title: String {
-        store.snapshot?.city.displayName ?? store.city.displayName
+    // MARK: 天气渐变背景
+
+    private var background: LinearGradient {
+        let snap = store.snapshot
+        let code = snap?.current?.weatherCode ?? ""
+        let raining = snap?.minute.isRaining() ?? false
+        let night = Calendar.current.component(.hour, from: Date()) < 6 || Calendar.current.component(.hour, from: Date()) >= 19
+        let snow = ["13","14","15","16","17","26","27","28"].contains(code)
+        let thunder = ["04","05"].contains(code)
+        let fog = ["18","29","30","31","32","53"].contains(code)
+
+        let colors: [Color]
+        if raining || thunder {
+            colors = [Color(red: 0.22, green: 0.34, blue: 0.52), Color(red: 0.07, green: 0.11, blue: 0.22)]
+        } else if snow {
+            colors = [Color(red: 0.55, green: 0.65, blue: 0.78), Color(red: 0.20, green: 0.26, blue: 0.38)]
+        } else if fog {
+            colors = [Color(red: 0.45, green: 0.48, blue: 0.52), Color(red: 0.18, green: 0.20, blue: 0.24)]
+        } else if code == "00" || code == "01" {
+            colors = night
+                ? [Color(red: 0.10, green: 0.14, blue: 0.30), Color(red: 0.02, green: 0.03, blue: 0.10)]
+                : [Color(red: 0.36, green: 0.62, blue: 0.88), Color(red: 0.12, green: 0.28, blue: 0.55)]
+        } else if code == "02" {
+            colors = [Color(red: 0.40, green: 0.47, blue: 0.58), Color(red: 0.14, green: 0.17, blue: 0.26)]
+        } else {
+            colors = [Color(red: 0.30, green: 0.44, blue: 0.62), Color(red: 0.08, green: 0.13, blue: 0.26)]
+        }
+        return LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom)
     }
 
-    // MARK: 核心：多久下雨 / 多久停
+    // MARK: 头部
+
+    private func header(_ snap: WeatherSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button { showCityPicker = true } label: {
+                HStack(spacing: 5) {
+                    Text(snap.city.name == snap.city.city ? "\(snap.city.province)·\(snap.city.city)" : "\(snap.city.city) · \(snap.city.name)")
+                        .font(.title2.bold())
+                    Image(systemName: "chevron.down").font(.caption.bold())
+                }
+                .foregroundStyle(.white)
+            }
+            HStack(alignment: .top, spacing: 14) {
+                Text("\(snap.current?.tempC ?? 0)°")
+                    .font(.system(size: 76, weight: .thin))
+                    .foregroundStyle(.white)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(snap.current?.weatherText ?? "")
+                        .font(.title3).foregroundStyle(.white.opacity(0.95))
+                    HStack(spacing: 10) {
+                        if let h = snap.current?.humidity {
+                            Label("\(h)%", systemImage: "humidity").font(.footnote)
+                        }
+                        Label("\(snap.current?.windDirec ?? "")\(snap.current?.windPower ?? "")", systemImage: "wind")
+                            .font(.footnote)
+                    }
+                    .foregroundStyle(.white.opacity(0.75))
+                }
+                Spacer()
+                if let cur = snap.current {
+                    Image(systemName: WIcon.symbol(code: cur.weatherCode))
+                        .font(.system(size: 40, weight: .thin))
+                        .foregroundStyle(.white.opacity(0.9))
+                }
+            }
+        }
+        .padding(.top, 8)
+    }
+
+    // MARK: 雨情卡（核心）
 
     private func rainCard(_ snap: WeatherSnapshot) -> some View {
         let m = snap.minute
-        return VStack(alignment: .leading, spacing: 6) {
-            if m.available {
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "drop.fill").font(.caption).foregroundStyle(.cyan)
+                Text("分钟级降水").font(.caption.bold()).foregroundStyle(.white.opacity(0.8))
+                Spacer()
+                Text("起报 \(m.issuedAt?.formatted(.dateTime.hour().minute()) ?? "--")")
+                    .font(.caption2).foregroundStyle(.white.opacity(0.5))
+            }
+            Group {
                 if m.isRaining() {
                     if let stop = m.minutesUntilStop() {
-                        Text("正在下雨 · \(stop) 分钟后停").font(.title3.bold())
+                        Text("正在下雨 · 约 \(stop) 分钟后停").font(.title3.bold())
                     } else {
                         Text("正在下雨 · 两小时内持续").font(.title3.bold())
                     }
                 } else if let until = m.minutesUntilRain() {
-                    Text("\(until) 分钟后开始下雨").font(.title3.bold())
-                    Text("至少还要 \(m.minutesOfNoRain() ?? until) 分钟无明显降水")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                    Text("约 \(until) 分钟后开始下雨").font(.title3.bold())
                 } else {
                     Text("未来 2 小时无明显降水").font(.title3.bold())
                 }
-                if let msg = m.summary, !msg.isEmpty {
-                    Text(msg).font(.subheadline).foregroundStyle(.secondary)
-                }
-                Text("中国天气网官方 · MPF 短临 · 起报 \(m.issuedAt?.formatted(.dateTime.hour().minute()) ?? "--")")
-                    .font(.caption2).foregroundStyle(.tertiary)
-            } else {
-                Text("分钟级降水暂不可用").font(.title3)
-                Text("下拉重试或检查网络").font(.caption).foregroundStyle(.secondary)
+            }
+            .foregroundStyle(.white)
+
+            if let msg = m.summary, !msg.isEmpty {
+                Text(msg).font(.subheadline).foregroundStyle(.white.opacity(0.85))
+            }
+
+            RainBars(points: m.points).frame(height: 44).padding(.top, 2)
+            HStack {
+                Text("现在").font(.caption2).foregroundStyle(.white.opacity(0.5))
+                Spacer()
+                Text("2 小时后").font(.caption2).foregroundStyle(.white.opacity(0.5))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .padding(16)
+        .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 20))
     }
 
-    private func currentCard(_ cur: CurrentWeather) -> some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(cur.tempC)°").font(.system(size: 52, weight: .thin))
-                Text(cur.weatherText).font(.headline)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 4) {
-                if let h = cur.humidity { Text("湿度 \(h)%").font(.subheadline) }
-                Text("\(cur.windDirec) \(cur.windPower)").font(.subheadline)
-                if let r = cur.rainMM, r > 0 { Text("降水 \(String(format: "%.1f", r)) mm").font(.subheadline) }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(.background, in: RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
-    }
+    // MARK: 逐天
 
     private func daysCard(_ days: [DayForecast]) -> some View {
-        VStack(spacing: 8) {
-            ForEach(days) { d in
-                HStack {
-                    Text(WeatherText.weekday(d.date) + " " + d.date.formatted(.dateTime.month().day()))
-                        .font(.subheadline).frame(width: 110, alignment: .leading)
-                    Text(WeatherText.fromCode(d.dayWeatherCode))
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    Spacer()
-                    Text("\(d.lowC)° / \(d.highC)°").font(.subheadline.monospacedDigit())
-                    Text(d.windPower.isEmpty ? "" : "\(d.windPower)级")
-                        .font(.caption).foregroundStyle(.tertiary).frame(width: 56, alignment: .trailing)
+        VStack(alignment: .leading, spacing: 10) {
+            Label("未来预报", systemImage: "calendar")
+                .font(.caption.bold()).foregroundStyle(.white.opacity(0.8))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(days) { d in
+                        VStack(spacing: 6) {
+                            Text(WeatherText.weekday(d.date)).font(.caption).foregroundStyle(.white.opacity(0.75))
+                            Image(systemName: WIcon.symbol(code: d.dayWeatherCode))
+                                .font(.system(size: 22, weight: .thin)).foregroundStyle(.white)
+                            Text(WeatherText.fromCode(d.dayWeatherCode))
+                                .font(.caption2).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
+                            Text("\(d.highC)°").font(.subheadline.bold()).foregroundStyle(.white)
+                            Text("\(d.lowC)°").font(.caption).foregroundStyle(.white.opacity(0.55))
+                        }
+                        .frame(width: 62)
+                        .padding(.vertical, 10)
+                        .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+                    }
                 }
-                if d.id != days.last?.id { Divider() }
+            }
+            if store.city.id.count > 9 {
+                Text("实况与预报来自所属区县").font(.caption2).foregroundStyle(.white.opacity(0.45))
             }
         }
-        .padding()
-        .background(.background, in: RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+        .padding(16)
+        .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 20))
     }
+
+    // MARK: 预警
 
     private func alertsCard(_ alerts: [WeatherAlert]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(alerts, id: \.title) { a in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("⚠️ \(a.title)").font(.subheadline.bold()).foregroundStyle(.orange)
-                    Text(a.text).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "exclamationmark.triangle.fill").font(.caption)
+                        Text(a.title).font(.subheadline.bold())
+                    }
+                    .foregroundStyle(.yellow)
+                    Text(a.text).font(.caption).foregroundStyle(.white.opacity(0.8)).lineLimit(3)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(.yellow.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+            }
+        }
+    }
+
+    private func footer(_ snap: WeatherSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("中国天气网官方 · 更新 \(snap.fetchedAt.formatted(.dateTime.hour().minute())) · 每 10 分钟自动刷新")
+                .font(.caption2).foregroundStyle(.white.opacity(0.5))
+            Text("Build \(WeatherStore.buildTag)").font(.caption2).foregroundStyle(.white.opacity(0.3))
+        }
+        .padding(.top, 4)
+    }
+}
+
+// MARK: - 2 小时降水柱状图
+
+struct RainBars: View {
+    let points: [MinutePoint]
+
+    var body: some View {
+        let now = Date()
+        let visible = points.filter { $0.time >= now && $0.time <= now.addingTimeInterval(2 * 3600) }
+        let maxP = max(0.5, visible.map(\.precipMM).max() ?? 0.5)
+        return HStack(alignment: .bottom, spacing: 3) {
+            if visible.isEmpty {
+                ForEach(0..<20, id: \.self) { _ in
+                    Capsule().fill(Color.white.opacity(0.15)).frame(maxWidth: .infinity)
+                        .frame(height: 3)
+                }
+            } else {
+                ForEach(Array(visible.enumerated()), id: \.offset) { _, p in
+                    Capsule()
+                        .fill(p.precipMM >= 0.05
+                             ? LinearGradient(colors: [Color.cyan, Color.blue], startPoint: .top, endPoint: .bottom)
+                             : LinearGradient(colors: [Color.white.opacity(0.25), Color.white.opacity(0.15)], startPoint: .top, endPoint: .bottom))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: max(3, CGFloat(min(1.0, p.precipMM / maxP)) * 42))
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
     }
+}
 
-    private func footerCard(_ snap: WeatherSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("数据源：中国天气网官方 · 更新时间 \(snap.fetchedAt.formatted(.dateTime.hour().minute())) · 每 10 分钟自动刷新")
-                .font(.caption2).foregroundStyle(.secondary)
-            if snap.isStale { Text("数据可能已过期").font(.caption2).foregroundStyle(.orange) }
-            Text("Build \(WeatherStore.buildTag)").font(.caption2).foregroundStyle(.tertiary)
-        }
-    }
+// MARK: - 天气图标映射
 
-    private func placeholderCard() -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: "cloud.sun").font(.largeTitle).foregroundStyle(.secondary)
-            Text(store.isLoading ? "正在获取数据…" : "等待首次更新").font(.headline)
-            Text("打开 App 自动获取 · 仅贵州省城市 · 无需任何 Key")
-                .font(.caption).foregroundStyle(.secondary)
+enum WIcon {
+    static func symbol(code: String) -> String {
+        switch code {
+        case "00": return "sun.max.fill"
+        case "01": return "cloud.sun.fill"
+        case "02": return "cloud.fill"
+        case "03": return "cloud.rain.fill"
+        case "04", "05": return "cloud.bolt.rain.fill"
+        case "06": return "cloud.sleet.fill"
+        case "07", "21": return "cloud.rain.fill"
+        case "08", "22": return "cloud.drizzle.fill"
+        case "09", "10", "23", "24", "25": return "cloud.heavyrain.fill"
+        case "11", "12": return "cloud.heavyrain.fill"
+        case "13": return "cloud.snow.fill"
+        case "14", "26": return "snowflake"
+        case "15", "16", "27": return "cloud.snow.fill"
+        case "17", "28": return "snowflake"
+        case "18": return "cloud.fog.fill"
+        case "19": return "cloud.sleet.fill"
+        case "20", "30", "31": return "wind"
+        case "29": return "sun.haze.fill"
+        case "32", "53": return "cloud.haze.fill"
+        default: return "questionmark"
         }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
@@ -252,7 +372,7 @@ struct CityPickerView: View {
                     Text(subtitle).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                if city.id == store.city.id {
+                if city.id == store.city.id || city.name == store.city.name {
                     Image(systemName: "checkmark").foregroundStyle(.tint)
                 }
             }
