@@ -105,9 +105,9 @@ struct MediumWidgetView: View {
 
     private var background: LinearGradient {
         let snap = entry.snapshot
-        WeatherTheme.gradient(code: snap?.current?.weatherCode ?? "",
-                              raining: snap?.minute.isRaining(from: entry.date) ?? false,
-                              night: WeatherTheme.isNight(entry.date))
+        return WeatherTheme.gradient(code: snap?.current?.weatherCode ?? "",
+                                     raining: snap?.minute.isRaining(from: entry.date) ?? false,
+                                     night: WeatherTheme.isNight(entry.date))
     }
 
     var body: some View {

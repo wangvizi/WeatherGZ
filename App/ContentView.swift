@@ -63,9 +63,9 @@ struct ContentView: View {
 
     private var background: LinearGradient {
         let snap = store.snapshot
-        WeatherTheme.gradient(code: snap?.current?.weatherCode ?? "",
-                              raining: snap?.minute.isRaining() ?? false,
-                              night: WeatherTheme.isNight())
+        return WeatherTheme.gradient(code: snap?.current?.weatherCode ?? "",
+                                     raining: snap?.minute.isRaining() ?? false,
+                                     night: WeatherTheme.isNight())
     }
 
     // MARK: 头部
