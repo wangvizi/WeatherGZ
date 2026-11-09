@@ -127,7 +127,7 @@ public struct WeatherClient {
                 date = cal.date(byAdding: .year, value: 1, to: date)!
             }
             let df = cal.dateComponents([.year, .month, .day], from: date)
-            let key = String(format: "%04d%02d%02d", df.year ?? 0, df.month ?? 0, df.day ?? 0)
+            let key = String(format: "%04d-%02d-%02d", df.year ?? 0, df.month ?? 0, df.day ?? 0)
             out.append(DayForecast(
                 dateKey: key, date: date,
                 highC: Int(f["fc"] as? String ?? "") ?? 0,

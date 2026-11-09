@@ -246,6 +246,20 @@ enum RainTimeline {
         return out
     }
 
+    /// 小组件用紧凑文案："11分后转大雨 · 55分后雨停"
+    static func compactText(_ m: MinuteForecast, from date: Date = Date()) -> String {
+        let evs = events(m, from: date)
+        guard !evs.isEmpty else { return "" }
+        return evs.prefix(3).map { e -> String in
+            var t = e.text
+            for (a, b) in [("雨势变大，", ""), ("雨势变小，", ""), ("开始下", "有"),
+                           (" 小时 ", "小时"), (" 分钟", "分"), (" 小时", "小时"), (" 分", "分")] {
+                t = t.replacingOccurrences(of: a, with: b)
+            }
+            return t
+        }.joined(separator: " · ")
+    }
+
     static func headline(_ m: MinuteForecast, from date: Date = Date()) -> String {
         guard m.available else { return "分钟级降水暂不可用" }
         if m.isRaining(from: date) { return "正在下雨" }
