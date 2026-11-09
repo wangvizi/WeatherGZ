@@ -54,7 +54,14 @@ struct ContentView: View {
                 }
             }
             .refreshable { await store.refresh() }
-            .task { await store.refreshIfNeeded() }
+            .task {
+                if !UserDefaults.standard.bool(forKey: "didAutoLocate") {
+                    UserDefaults.standard.set(true, forKey: "didAutoLocate")
+                    await store.autoLocate()
+                } else {
+                    await store.refreshIfNeeded()
+                }
+            }
             .sheet(isPresented: $showCityPicker) { CityPickerView() }
         }
     }
@@ -250,10 +257,32 @@ struct CityPickerView: View {
     @State private var results: [WeatherClient.SearchCity] = []
     @State private var searching = false
     @State private var searchError: String?
+    @State private var locating = false
 
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    Button {
+                        locating = true
+                        Task {
+                            await store.autoLocate()
+                            locating = false
+                            if store.lastError == nil { dismiss() }
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "location.fill").foregroundStyle(.tint)
+                            Text("自动定位当前城市").font(.body)
+                            Spacer()
+                            if locating { ProgressView() }
+                        }
+                    }
+                    .disabled(locating)
+                    if let err = store.lastError, locating || err.hasPrefix("定位") {
+                        Text(err).font(.caption).foregroundStyle(.orange)
+                    }
+                }
                 Section {
                     HStack {
                         Image(systemName: "magnifyingglass").foregroundStyle(.secondary)

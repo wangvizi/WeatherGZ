@@ -5,7 +5,7 @@ import Combine
 @MainActor
 final class WeatherStore: ObservableObject {
     static let shared = WeatherStore()
-    static let buildTag = "v2.2-gz"
+    static let buildTag = "v2.3-gz"
     static let refreshInterval: TimeInterval = 10 * 60
 
     @Published var snapshot: WeatherSnapshot?
@@ -68,6 +68,24 @@ final class WeatherStore: ObservableObject {
     func refreshIfNeeded() async {
         if snapshot == nil || SharedStore.isStale(snapshot!) {
             await refresh()
+        }
+    }
+
+    /// 自动定位并切换到所在贵州城市
+    func autoLocate() async {
+        isLoading = true
+        lastError = nil
+        defer { isLoading = false }
+        do {
+            let c = try await LocationResolver.shared.resolveCurrentCity()
+            if c.id == city.id {
+                await refresh()
+            } else {
+                city = c // didSet 自动刷新
+            }
+        } catch {
+            lastError = "定位失败：\(error.localizedDescription)"
+            await refreshIfNeeded()
         }
     }
 
