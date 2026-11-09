@@ -136,71 +136,91 @@ struct MediumWidgetView: View {
     }
 
     private func content(_ snap: WeatherSnapshot) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            // 左列：城市/预警、温度、风湿度、雨情、更新时间
+        let events = RainTimeline.events(snap.minute, from: entry.date)
+        return HStack(alignment: .top, spacing: 8) {
+            // 左列
             VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Image(systemName: "location.north.line.fill")
-                        .font(.system(size: 9)).opacity(0.8)
+                        .font(.system(size: 8)).opacity(0.7)
                     Text(snap.city.name)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                     Spacer(minLength: 4)
                     if let alert = snap.alerts.first {
                         Text(alert.title)
-                            .font(.system(size: 9, weight: .medium))
+                            .font(.system(size: 8, weight: .medium))
                             .lineLimit(1)
-                            .padding(.horizontal, 7).padding(.vertical, 3)
+                            .padding(.horizontal, 6).padding(.vertical, 2.5)
                             .background(.white.opacity(0.22), in: Capsule())
                     }
                 }
 
-                Spacer(minLength: 2)
+                Spacer(minLength: 0)
 
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("\(snap.current?.tempC ?? 0)°")
-                        .font(.system(size: 36, weight: .thin))
+                        .font(.system(size: 34, weight: .thin))
                     Text(snap.current?.weatherText ?? "")
-                        .font(.system(size: 13)).opacity(0.9)
+                        .font(.system(size: 12)).opacity(0.9)
+                    Spacer(minLength: 0)
+                    Image(systemName: WIcon.symbol(code: snap.current?.weatherCode ?? "",
+                                                   night: WeatherTheme.isNight(entry.date)))
+                        .font(.system(size: 22))
+                        .opacity(0.9)
                 }
                 HStack(spacing: 8) {
                     Text("\(snap.current?.windDirec ?? "") \(snap.current?.windPower ?? "")")
                     if let h = snap.current?.humidity { Text("湿度 \(h)%") }
                 }
-                .font(.system(size: 11)).opacity(0.75)
+                .font(.system(size: 10)).opacity(0.7)
 
-                Spacer(minLength: 4)
+                Spacer(minLength: 2)
 
-                Text(RainMessage.text(snap.minute, from: entry.date))
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(RainTimeline.headline(snap.minute, from: entry.date))
+                    .font(.system(size: 12, weight: .bold))
+                if !events.isEmpty {
+                    Text(events.prefix(3).map(\.text).joined(separator: " · "))
+                        .font(.system(size: 10, weight: .medium))
+                        .opacity(0.85)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let msg = snap.minute.summary, !msg.isEmpty {
+                    Text(msg).font(.system(size: 10)).opacity(0.7).lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+
                 HStack(spacing: 4) {
                     Text(snap.fetchedAt.formatted(.dateTime.hour().minute()) + " 更新")
-                        .font(.system(size: 9)).opacity(0.55)
+                        .font(.system(size: 9)).opacity(0.5)
                     if snap.isStale {
-                        Text("· 打开 App 刷新").font(.system(size: 9)).foregroundStyle(.yellow.opacity(0.8))
+                        Text("· 打开 App 刷新").font(.system(size: 9)).foregroundStyle(.yellow.opacity(0.85))
                     }
                 }
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
 
-            // 右列：四天预报
-            VStack(spacing: 8) {
+            // 右列：四天预报（固定列宽对齐）
+            VStack(spacing: 9) {
                 ForEach(snap.days.prefix(4)) { d in
-                    HStack(spacing: 6) {
+                    HStack(spacing: 0) {
                         Text(WeatherText.weekday(d.date))
-                            .font(.system(size: 11)).frame(width: 30, alignment: .leading)
+                            .font(.system(size: 11)).frame(width: 34, alignment: .leading)
                         Image(systemName: WIcon.symbol(code: d.dayWeatherCode))
-                            .font(.system(size: 12)).frame(width: 20)
+                            .font(.system(size: 11)).frame(width: 22)
                         Text("\(d.highC)°")
                             .font(.system(size: 12, weight: .semibold))
+                            .frame(width: 26, alignment: .trailing)
                         Text("\(d.lowC)°")
-                            .font(.system(size: 11)).opacity(0.55)
+                            .font(.system(size: 11)).opacity(0.5)
+                            .frame(width: 26, alignment: .trailing)
                     }
-                    .foregroundStyle(.white)
                 }
             }
+            .foregroundStyle(.white)
+            .frame(width: 112, alignment: .trailing)
             .padding(.top, 2)
         }
         .padding(12)
@@ -250,13 +270,13 @@ struct LockScreenWidgetView: View {
     }
 
     private var rainLine: String {
-        guard let m = snap?.minute, m.available else { return "分钟级降水暂不可用" }
-        if m.isRaining(from: entry.date) {
-            if let stop = m.minutesUntilStop(from: entry.date) { return "正在下雨 · \(stop) 分钟后停" }
-            return "正在下雨 · 持续中"
+        guard let m = snap?.minute else { return "分钟级降水暂不可用" }
+        let head = RainTimeline.headline(m, from: entry.date)
+        let ev = RainTimeline.events(m, from: entry.date)
+        if let stop = ev.last(where: { $0.text.contains("雨停") }) {
+            return head + " · " + stop.text
         }
-        if let until = m.minutesUntilRain(from: entry.date) { return "\(until) 分钟后开始下" }
-        return "未来 2 小时无明显降水"
+        return head
     }
 
     private var inlineText: String {

@@ -105,7 +105,7 @@ struct ContentView: View {
                 }
                 Spacer()
                 if let cur = snap.current {
-                    Image(systemName: WIcon.symbol(code: cur.weatherCode))
+                    Image(systemName: WIcon.symbol(code: cur.weatherCode, night: WeatherTheme.isNight()))
                         .font(.system(size: 40, weight: .thin))
                         .foregroundStyle(.white.opacity(0.9))
                 }
@@ -118,7 +118,8 @@ struct ContentView: View {
 
     private func rainCard(_ snap: WeatherSnapshot) -> some View {
         let m = snap.minute
-        return VStack(alignment: .leading, spacing: 10) {
+        let events = RainTimeline.events(m)
+        return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 6) {
                 Image(systemName: "drop.fill").font(.caption).foregroundStyle(.cyan)
                 Text("分钟级降水").font(.caption.bold()).foregroundStyle(.white.opacity(0.8))
@@ -126,26 +127,28 @@ struct ContentView: View {
                 Text("起报 \(m.issuedAt?.formatted(.dateTime.hour().minute()) ?? "--")")
                     .font(.caption2).foregroundStyle(.white.opacity(0.5))
             }
-            Group {
-                if m.isRaining() {
-                    if let stop = m.minutesUntilStop() {
-                        Text("正在下雨 · 约 \(stop) 分钟后停").font(.title3.bold())
-                    } else {
-                        Text("正在下雨 · 两小时内持续").font(.title3.bold())
+            Text(RainTimeline.headline(m))
+                .font(.title2.bold()).foregroundStyle(.white)
+
+            if !events.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(events.enumerated()), id: \.offset) { _, e in
+                            Text(e.text)
+                                .font(.caption.weight(.medium))
+                                .padding(.horizontal, 12).padding(.vertical, 7)
+                                .background(.white.opacity(0.16), in: Capsule())
+                                .foregroundStyle(.white)
+                        }
                     }
-                } else if let until = m.minutesUntilRain() {
-                    Text("约 \(until) 分钟后开始下雨").font(.title3.bold())
-                } else {
-                    Text("未来 2 小时无明显降水").font(.title3.bold())
                 }
             }
-            .foregroundStyle(.white)
 
             if let msg = m.summary, !msg.isEmpty {
                 Text(msg).font(.subheadline).foregroundStyle(.white.opacity(0.85))
             }
 
-            RainBars(points: m.points).frame(height: 44).padding(.top, 2)
+            RainBars(points: m.points).frame(height: 44)
             HStack {
                 Text("现在").font(.caption2).foregroundStyle(.white.opacity(0.5))
                 Spacer()
@@ -153,8 +156,8 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 20))
+        .padding(18)
+        .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 24))
     }
 
     // MARK: 逐天
